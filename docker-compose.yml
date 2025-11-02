@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  ai-query-service:
+    build: .
+    container_name: ai-sleep-coach-query
+    ports:
+      - "8000:8000"
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - OLLAMA_API_URL=${OLLAMA_API_URL}
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
