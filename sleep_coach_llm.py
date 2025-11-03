@@ -528,9 +528,14 @@ class SleepCoachAgent:
             print(f"Error calling LLM API: {e}")
             return f"[ERROR] I encountered an error while processing your request: {str(e)}"
     
-    def get_personal_data(self, query: str, user_pseudo_id: str, days: int = 7) -> Dict:
-        """Analytics Tool: Get personal sleep data and trends"""
-        return self.analytics_db.calculate_trends(user_pseudo_id, days)
+    def get_personal_data(self, query: str, customer_id: str, days: int = 7) -> Dict:
+        """Analytics Tool: Get personal sleep data and trends
+        Args:
+            query: User's query (for context)
+            customer_id: Original customer ID for database queries (NOT pseudonymized)
+            days: Number of days to analyze
+        """
+        return self.analytics_db.calculate_trends(customer_id, days)
     
     def get_cohort_comparison(self, metric: str, value: float) -> Dict:
         """Cohort Tool: Compare with anonymized cohort data"""
@@ -555,8 +560,15 @@ class SleepCoachAgent:
             "format": "json"
         }
     
-    def process_query(self, user_pseudo_id: str, query: str) -> Dict:
-        """Process user query and determine query type"""
+    def process_query(self, customer_id: str, query: str, user_pseudo_id: str = None) -> Dict:
+        """Process user query and determine query type
+        Args:
+            customer_id: Original customer ID for database queries (NOT pseudonymized)
+            query: User's query string
+            user_pseudo_id: Pseudonymized ID for logging/output (optional, defaults to customer_id)
+        """
+        if user_pseudo_id is None:
+            user_pseudo_id = customer_id
         query_lower = query.lower()
         
         response = {
@@ -589,8 +601,9 @@ class SleepCoachAgent:
                     days = 90  # For historical queries, use 90 days
                     
                 # For explicit last N days queries, do not allow fallback
+                # Use customer_id (not pseudonymized) for database queries
                 allow_fb = not ("last" in query_lower and "days" in query_lower)
-                data = self.analytics_db.calculate_trends(user_pseudo_id, days, allow_fallback=allow_fb)
+                data = self.analytics_db.calculate_trends(customer_id, days, allow_fallback=allow_fb)
                 # Annotate how many records and the range used
                 if "dates" in data:
                     try:
@@ -657,21 +670,22 @@ class SleepCoachAgent:
                     
             elif any(keyword in query_lower for keyword in ["compare", "percentile", "others", "average", "how do i compare"]):
                 # Cohort comparison query
-                recent_data = self.get_personal_data(query, user_pseudo_id, 7)
+                # Use customer_id (not pseudonymized) for database queries
+                recent_data = self.get_personal_data(query, customer_id, 7)
 
                 # Progressive backoff on range: 7 -> 30 -> 90 -> any
                 data_candidate = recent_data
                 if "error" in data_candidate:
-                    data_candidate = self.get_personal_data(query, user_pseudo_id, 30)
+                    data_candidate = self.get_personal_data(query, customer_id, 30)
                 if "error" in data_candidate:
-                    data_candidate = self.get_personal_data(query, user_pseudo_id, 90)
+                    data_candidate = self.get_personal_data(query, customer_id, 90)
                 if "error" in data_candidate:
                     today = datetime.date.today()
-                    data_candidate = self.analytics_db.get_user_data(user_pseudo_id, datetime.date(2020, 1, 1), today)
+                    data_candidate = self.analytics_db.get_user_data(customer_id, datetime.date(2020, 1, 1), today)
                     if isinstance(data_candidate, list) and data_candidate:
                         # Wrap into trends-like structure for downstream
                         # Reuse calculate_trends to ensure shape
-                        data_candidate = self.analytics_db.calculate_trends(user_pseudo_id, (today - datetime.date(2020,1,1)).days)
+                        data_candidate = self.analytics_db.calculate_trends(customer_id, (today - datetime.date(2020,1,1)).days)
 
                 if "error" in data_candidate:
                     # Provide suggestions if available
@@ -927,14 +941,18 @@ class SleepCoachLLM:
         self.cohort_analytics.update_cohort_statistics()
         
     def handle_user_query(self, user_id: str, query: str) -> Dict:
-        """Handle user query about sleep data or knowledge"""
-        # 1. Pseudonymize user ID
+        """Handle user query about sleep data or knowledge
+        Args:
+            user_id: Original customer_id (passed directly to database, not pseudonymized)
+            query: User's query string
+        """
+        # 1. Pseudonymize user ID (for logging/output only)
         user_pseudo_id = self.privacy_processor.get_pseudo_id(user_id)
         
-        # 2. Process query through agent
-        response = self.agent.process_query(user_pseudo_id, query)
+        # 2. Process query through agent (pass original customer_id for DB queries)
+        response = self.agent.process_query(user_id, query, user_pseudo_id)
         
-        # 3. Log interaction
+        # 3. Log interaction (use pseudonymized ID for privacy)
         self.logger.log_interaction(user_pseudo_id, query, response)
         
         return response
