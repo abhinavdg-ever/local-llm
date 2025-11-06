@@ -22,10 +22,13 @@ RUN echo "=== Current directory ===" && \
     test -f src/lib/utils.ts && echo "✓ utils.ts exists" || (echo "✗ utils.ts MISSING!" && find . -name "utils.ts" -type f 2>/dev/null) && \
     echo "=== Checking vite.config.ts ===" && \
     test -f vite.config.ts && echo "✓ vite.config.ts exists" || echo "✗ vite.config.ts MISSING" && \
+    echo "=== Checking vite.config.ts content ===" && \
+    cat vite.config.ts && \
     echo "=== File structure check ===" && \
     find src -type f -name "*.ts" -o -name "*.tsx" | head -10
 
-RUN npm run build
+# Build with verbose output
+RUN npm run build 2>&1 | head -50 || (echo "=== Build failed, checking paths ===" && cat vite.config.ts && ls -la src/lib/ && exit 1)
 
 # Production stage
 FROM python:3.11-slim
