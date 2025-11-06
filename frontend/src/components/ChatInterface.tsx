@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 // Configurable user ID - can be set via environment variable
 const DEFAULT_USER_ID = import.meta.env.VITE_DEFAULT_USER_ID || "12";
 
-// Use proxy in dev mode, or direct API URL
+// Use proxy in dev mode, or relative URL in production (nginx handles proxying)
 const getApiUrl = () => {
   if (import.meta.env.DEV) {
     return "/api"; // Use proxy from vite.config.ts
   }
-  return import.meta.env.VITE_API_URL || "http://localhost:8000";
+  // In production, use relative URL so nginx can proxy the request
+  // Nginx is configured to proxy /api/* to FastAPI on port 8001
+  return import.meta.env.VITE_API_URL || "/api";
 };
 const API_URL = getApiUrl();
 
