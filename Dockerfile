@@ -11,8 +11,19 @@ RUN npm ci
 # Copy all frontend files (including src/lib/utils.ts)
 COPY frontend/ .
 
-# Verify utils.ts exists before build
-RUN ls -la src/lib/ || echo "Warning: src/lib directory not found"
+# Verify file structure and critical files exist
+RUN echo "=== Current directory ===" && \
+    pwd && \
+    echo "=== Root files ===" && \
+    ls -la && \
+    echo "=== Checking src/lib/ ===" && \
+    ls -la src/lib/ && \
+    echo "=== Verifying utils.ts ===" && \
+    test -f src/lib/utils.ts && echo "✓ utils.ts exists" || (echo "✗ utils.ts MISSING!" && find . -name "utils.ts" -type f 2>/dev/null) && \
+    echo "=== Checking vite.config.ts ===" && \
+    test -f vite.config.ts && echo "✓ vite.config.ts exists" || echo "✗ vite.config.ts MISSING" && \
+    echo "=== File structure check ===" && \
+    find src -type f -name "*.ts" -o -name "*.tsx" | head -10
 
 RUN npm run build
 
