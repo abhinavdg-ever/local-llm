@@ -12,7 +12,31 @@ COPY frontend/package-lock.json* ./
 RUN npm ci
 
 # Copy all frontend files
-COPY frontend/ .
+# Build context is /apps/local-llm/, so frontend/ refers to /apps/local-llm/frontend/
+# Copy src directory explicitly to ensure it's included
+COPY frontend/src ./src
+COPY frontend/public ./public
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig*.json ./
+COPY frontend/tailwind.config.ts ./
+COPY frontend/postcss.config.js ./
+COPY frontend/components.json ./
+COPY frontend/eslint.config.js ./
+
+# Debug: Verify files were copied correctly
+RUN echo "=== Verifying copied files ===" && \
+    pwd && \
+    echo "=== Root directory contents ===" && \
+    ls -la && \
+    echo "=== Checking if src exists ===" && \
+    test -d src && (echo "✓ src/ exists" && ls -la src/) || echo "✗ src/ does not exist" && \
+    echo "=== Checking if src/lib exists ===" && \
+    test -d src/lib && (echo "✓ src/lib/ exists" && ls -la src/lib/) || echo "✗ src/lib/ does not exist" && \
+    echo "=== Looking for utils.ts ===" && \
+    find . -name "utils.ts" -type f 2>/dev/null | head -5 || echo "✗ utils.ts not found" && \
+    echo "=== Full src directory structure (if exists) ===" && \
+    (test -d src && find src -type f 2>/dev/null | head -20 || echo "src directory not found")
 
 # Build frontend
 RUN npm run build
