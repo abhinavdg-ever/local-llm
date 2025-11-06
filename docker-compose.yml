@@ -5,7 +5,7 @@ services:
     build: .
     container_name: ai-sleep-coach
     ports:
-      - "8000:80"
+      - "8015:80"
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
       - MYSQL_USER=${MYSQL_USER}
@@ -21,7 +21,7 @@ services:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]  
       interval: 30s
       timeout: 10s
       retries: 3

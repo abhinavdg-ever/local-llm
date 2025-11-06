@@ -3,7 +3,7 @@
 # Run FastAPI with reload, excluding venv and other unnecessary directories
 uvicorn app:app \
   --host 0.0.0.0 \
-  --port 8001 \
+  --port 8000 \
   --reload \
   --reload-exclude "venv/*" \
   --reload-exclude "*.pyc" \
@@ -12,5 +12,5 @@ uvicorn app:app \
   --reload-exclude "*.log"
 
 # To run WITHOUT reload, just use:
-# uvicorn app:app --host 0.0.0.0 --port 8001
+# uvicorn app:app --host 0.0.0.0 --port 8000
 
