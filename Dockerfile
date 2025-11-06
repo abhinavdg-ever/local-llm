@@ -8,22 +8,30 @@ COPY frontend/package*.json ./
 COPY frontend/package-lock.json* ./
 RUN npm ci
 
-# Copy all frontend files (including src/lib/utils.ts)
-COPY frontend/ .
+# Copy frontend source files explicitly
+COPY frontend/src ./src
+COPY frontend/public ./public
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig*.json ./
+COPY frontend/tailwind.config.ts ./
+COPY frontend/postcss.config.js ./
+COPY frontend/components.json ./
+COPY frontend/eslint.config.js ./
 
 # Verify file structure and critical files exist
 RUN echo "=== Current directory ===" && \
     pwd && \
     echo "=== Root files ===" && \
     ls -la && \
+    echo "=== Checking src/ directory ===" && \
+    ls -la src/ && \
     echo "=== Checking src/lib/ ===" && \
-    ls -la src/lib/ && \
+    ls -la src/lib/ 2>&1 && \
     echo "=== Verifying utils.ts ===" && \
     test -f src/lib/utils.ts && echo "✓ utils.ts exists" || (echo "✗ utils.ts MISSING!" && find . -name "utils.ts" -type f 2>/dev/null) && \
     echo "=== Checking vite.config.ts ===" && \
     test -f vite.config.ts && echo "✓ vite.config.ts exists" || echo "✗ vite.config.ts MISSING" && \
-    echo "=== Checking vite.config.ts content ===" && \
-    cat vite.config.ts && \
     echo "=== File structure check ===" && \
     find src -type f -name "*.ts" -o -name "*.tsx" | head -10
 
@@ -60,8 +68,9 @@ COPY sleep_coach_llm.py .
 COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
 # Configure nginx to serve frontend and proxy API requests
+# Note: docker-compose.yml maps 8015:8000, so nginx listens on 8000 internally
 RUN echo 'server { \
-    listen 80; \
+    listen 8000; \
     server_name _; \
     root /var/www/html; \
     index index.html; \
@@ -71,10 +80,10 @@ RUN echo 'server { \
         try_files $uri $uri/ /index.html; \
     } \
     \
-    # Proxy API requests to FastAPI (strip /api prefix) \
+    # Proxy API requests to FastAPI on port 8001 (strip /api prefix) \
     location /api/ { \
         rewrite ^/api/(.*) /$1 break; \
-        proxy_pass http://localhost:8000; \
+        proxy_pass http://localhost:8001; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
@@ -83,7 +92,7 @@ RUN echo 'server { \
     \
     # Also proxy non-/api routes that are API endpoints (for backward compatibility) \
     location ~ ^/(health|query|wearable|knowledge|stats|trends|docs|redoc|openapi.json) { \
-        proxy_pass http://localhost:8000; \
+        proxy_pass http://localhost:8001; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
@@ -98,11 +107,11 @@ RUN mkdir -p logs
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
-# Expose port
-EXPOSE 80
+# Expose port (matches docker-compose.yml mapping 8015:8000)
+EXPOSE 8000
 
-# Health check
+# Health check (matches docker-compose.yml)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+    CMD curl -f http://localhost/health || exit 1
 
 CMD ["./docker-entrypoint.sh"]
